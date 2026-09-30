@@ -597,7 +597,8 @@ $APPLICATION->IncludeComponent(
 				{
 					return;
 				}
-				input.disabled = true;
+				// не disabled: пустая отправка слота нужна штатной механике
+				// «Удалить файл» (del=Y применяется к записям $_FILES)
 				input.style.display = 'none';
 				attachPond(input, m[1], m[2], m[3], false);
 			});
@@ -615,7 +616,8 @@ $APPLICATION->IncludeComponent(
 					return;
 				}
 				inputs.forEach(function (input) {
-					input.disabled = true;
+					// слот отправляется пустым: без записи $_FILES галочка
+					// «Удалить файл» компонентом не применяется
 					input.style.display = 'none';
 				});
 				var addButton = tbl.parentNode.querySelector('input[type=button][onclick*="' + tbl.id + '"]');
