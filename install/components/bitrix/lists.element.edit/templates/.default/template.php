@@ -487,6 +487,9 @@ $APPLICATION->IncludeComponent(
 					return;
 				}
 				var options = Object.assign({}, labels, {
+					// без storeAsFile FilePond не записывает файл в input,
+					// и при отправке формы файл не уходит на сервер
+					storeAsFile: true,
 					labelIdle: 'Перетащите файл или <span class="filepond--label-action">выберите</span>'
 				});
 				FilePond.create(input, options);
