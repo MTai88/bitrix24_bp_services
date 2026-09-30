@@ -47,6 +47,45 @@ $IBLOCK_ID = is_array($arParams['~IBLOCK_ID'])? 0: (int)$arParams['~IBLOCK_ID'];
 $ELEMENT_ID = is_array($arParams['~ELEMENT_ID'])? 0: (int)$arParams['~ELEMENT_ID'];
 $SECTION_ID = is_array($arParams['~SECTION_ID'])? 0: (int)$arParams['~SECTION_ID'];
 
+// mtai.bpservices: FilePond AJAX-загрузка. Контроллер модуля
+// (mtai.bpservices:file.upload) сохраняет файл и возвращает id; форма
+// отправляет только id (mtai_bpservices_files[PROPERTY_X][nK]). Здесь id
+// восстанавливаются в $_FILES, дальше — штатное сохранение свойств-файлов.
+if (
+	$_SERVER['REQUEST_METHOD'] === 'POST'
+	&& isset($_POST['mtai_bpservices_files'], $_SESSION['MTAI_BPSERVICES_FILES'])
+	&& is_array($_POST['mtai_bpservices_files'])
+	&& is_array($_SESSION['MTAI_BPSERVICES_FILES'])
+)
+{
+	foreach ($_POST['mtai_bpservices_files'] as $fieldKey => $files)
+	{
+		if (!preg_match('/^PROPERTY_(\d+)$/', (string)$fieldKey, $fieldMatch) || !is_array($files))
+		{
+			continue;
+		}
+		foreach ($files as $valueKey => $fileId)
+		{
+			$meta = $_SESSION['MTAI_BPSERVICES_FILES'][$fileId] ?? null;
+			if (
+				!is_array($meta)
+				|| (int)($meta['iblockId'] ?? 0) !== $IBLOCK_ID
+				|| (int)($meta['propertyId'] ?? 0) !== (int)$fieldMatch[1]
+				|| (int)($meta['userId'] ?? 0) !== $currentUserId
+				|| !is_file($meta['path'])
+			)
+			{
+				continue;
+			}
+			$_FILES[$fieldKey]['name'][$valueKey]['VALUE'] = $meta['name'];
+			$_FILES[$fieldKey]['tmp_name'][$valueKey]['VALUE'] = $meta['path'];
+			$_FILES[$fieldKey]['size'][$valueKey]['VALUE'] = (int)$meta['size'];
+			$_FILES[$fieldKey]['type'][$valueKey]['VALUE'] = $meta['type'];
+			$_FILES[$fieldKey]['error'][$valueKey]['VALUE'] = UPLOAD_ERR_OK;
+		}
+	}
+}
+
 $accessService =
 	(new \Bitrix\Lists\Api\Service\AccessService(
 		$currentUserId,

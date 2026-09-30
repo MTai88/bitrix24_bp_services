@@ -453,11 +453,12 @@ $APPLICATION->IncludeComponent(
 </div>
 
 <script data-skip-moving="true">
-	// mtai.bpservices: FilePond на файловых полях формы.
-	// Одиночное поле — пруд на самом input (FilePond вернёт файл в input при отправке).
-	// Множественное поле — штатная таблица рядов + кнопка «Добавить» скрываются,
-	// вместо них один пруд с мультизагрузкой; перед отправкой файлы раскладываются
-	// по отдельным input'ам PROPERTY_X[nI][VALUE] — серверная часть не меняется.
+	// mtai.bpservices: FilePond на файловых полях формы, загрузка сразу
+	// (AJAX) в контроллер модуля mtai.bpservices:file.upload. Файл уходит
+	// на сервер при выборе, форма отправляет только id
+	// (mtai_bpservices_files[PROPERTY_X][nK]); копия компонента перед
+	// сохранением восстанавливает файлы в $_FILES. Нативные input'ы
+	// отключаются — без JS форма работает как раньше.
 	(function () {
 		var initFilePond = function () {
 			if (!window.FilePond)
@@ -471,75 +472,118 @@ $APPLICATION->IncludeComponent(
 			}
 			form.setAttribute('data-filepond', 'Y');
 
+			var sessidInput = form.querySelector('[name="sessid"]');
+			var sessid = sessidInput ? sessidInput.value : (window.BX && BX.message('bitrix_sessid'));
+			var ajaxUrl = '/bitrix/services/main/ajax.php';
+			var iblockId = '<?= (int)$arResult["IBLOCK_ID"] ?>';
+
 			var labels = {
 				labelInvalidField: 'Поле содержит файлы неподходящего типа',
 				labelFileTypeNotAllowed: 'Файл этого типа загрузить нельзя',
 				labelFileWaitingForSize: 'Определяем размер',
 				labelFileSizeNotAvailable: 'Размер недоступен',
 				labelFileLoading: 'Чтение файла',
-				labelFileLoadError: 'Не удалось прочитать файл'
+				labelFileLoadError: 'Не удалось прочитать файл',
+				labelFileProcessing: 'Загрузка…',
+				labelFileProcessingComplete: 'Загружен',
+				labelFileProcessingAborted: 'Отменена',
+				labelFileProcessingError: 'Не удалось загрузить файл'
 			};
 
-			// одиночные файловые поля
-			form.querySelectorAll('input[type=file][name^="PROPERTY_"]').forEach(function (input) {
-				if (input.closest('table[id^="tblPROPERTY_"]'))
-				{
-					return;
-				}
-				var options = Object.assign({}, labels, {
-					// без storeAsFile FilePond не записывает файл в input,
-					// и при отправке формы файл не уходит на сервер
-					storeAsFile: true,
-					labelIdle: 'Перетащите файл или <span class="filepond--label-action">выберите</span>'
-				});
-				FilePond.create(input, options);
-			});
+			var createPond = function (anchor, propName, propertyId, multiple) {
+				// скрытые input'ы с id загруженных файлов добавляются сразу
+				// по завершению загрузки (не на submit) и снимаются при удалении
+				var idInputs = {};
+				var nextIndex = 0;
 
-			// множественные файловые поля
-			form.querySelectorAll('table[id^="tblPROPERTY_"]').forEach(function (tbl) {
-				var firstInput = tbl.querySelector('input[type=file]');
-				if (!firstInput)
-				{
-					return;
-				}
-				var nameMatch = firstInput.name.match(/^(PROPERTY_\d+)\[/);
+				var pond = FilePond.create(Object.assign({}, labels, {
+					allowMultiple: multiple,
+					instantUpload: true,
+					labelIdle: (multiple ? 'Перетащите файлы или ' : 'Перетащите файл или ')
+						+ '<span class="filepond--label-action">выберите</span>',
+					server: {
+						url: ajaxUrl,
+						process: {
+							url: '?action=mtai:bpservices.file.upload',
+							method: 'POST',
+							withCredentials: false,
+							timeout: 120000,
+							ondata: function (formData) {
+								formData.append('sessid', sessid);
+								formData.append('iblockId', iblockId);
+								formData.append('propertyId', String(propertyId));
+								return formData;
+							},
+							onload: function (response) {
+								var data = {};
+								try { data = JSON.parse(response); } catch (e) {}
+								if (!data || data.status !== 'success' || !data.data || !data.data.id)
+								{
+									throw 'upload failed';
+								}
+								return data.data.id;
+							}
+						},
+						revert: function (uniqueFileId, load, error) {
+							var body = 'id=' + encodeURIComponent(uniqueFileId) + '&sessid=' + encodeURIComponent(sessid);
+							fetch(ajaxUrl + '?action=mtai:bpservices.file.revert', {
+								method: 'POST',
+								headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+								body: body
+							}).then(load).catch(error);
+						}
+					}
+				}));
+
+				pond.on('processfile', function (err, file) {
+					if (err || !file.serverId || idInputs[file.id])
+					{
+						return;
+					}
+					var input = document.createElement('input');
+					input.type = 'hidden';
+					input.name = 'mtai_bpservices_files[' + propName + '][fp' + (nextIndex++) + ']';
+					input.value = file.serverId;
+					form.appendChild(input);
+					idInputs[file.id] = input;
+				});
+
+				pond.on('removefile', function (file) {
+					if (idInputs[file.id])
+					{
+						idInputs[file.id].parentNode.removeChild(idInputs[file.id]);
+						delete idInputs[file.id];
+					}
+				});
+
+				anchor.parentNode.insertBefore(pond.element, anchor);
+				return pond;
+			};
+
+			form.querySelectorAll('input[type=file][name^="PROPERTY_"]').forEach(function (input) {
+				var nameMatch = input.name.match(/^(PROPERTY_(\d+))\[/);
 				if (!nameMatch)
 				{
 					return;
 				}
-				var propName = nameMatch[1];
 
-				tbl.style.display = 'none';
-				var addButton = tbl.parentNode.querySelector('input[type=button][onclick*="' + tbl.id + '"]');
-				if (addButton)
+				// множественное поле — ряды в таблице tblPROPERTY_X + кнопка «Добавить»
+				var tbl = input.closest('table[id^="tblPROPERTY_"]');
+				var multiple = !!tbl;
+				if (tbl)
 				{
-					addButton.style.display = 'none';
+					tbl.style.display = 'none';
+					var addButton = tbl.parentNode.querySelector('input[type=button][onclick*="' + tbl.id + '"]');
+					if (addButton)
+					{
+						addButton.style.display = 'none';
+					}
 				}
 
-				var pond = FilePond.create(Object.assign({}, labels, {
-					allowMultiple: true,
-					labelIdle: 'Перетащите файлы или <span class="filepond--label-action">выберите</span>'
-				}));
-				tbl.parentNode.insertBefore(pond.element, tbl);
+				input.disabled = true; // нативная загрузка больше не участвует в отправке
+				input.style.display = 'none';
 
-				form.addEventListener('submit', function () {
-					var files = pond.getFiles();
-					for (var i = 0; i < files.length; i++)
-					{
-						var dt = new DataTransfer();
-						dt.items.add(files[i].file);
-						if (!dt.files.length)
-						{
-							continue;
-						}
-						var input = document.createElement('input');
-						input.type = 'file';
-						input.name = propName + '[n' + i + '][VALUE]';
-						input.files = dt.files;
-						input.style.display = 'none';
-						form.appendChild(input);
-					}
-				}, true);
+				createPond(tbl || input, nameMatch[1], nameMatch[2], multiple);
 			});
 		};
 
