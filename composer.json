@@ -1,0 +1,19 @@
+{
+	"name": "mtai/bpservices",
+	"description": "Business process services: a catalog grid of Bitrix24 universal lists with a public /bp-services/ page for employees",
+	"type": "bitrix-module",
+	"keywords": ["bitrix", "bitrix24", "bizproc", "lists", "universal lists", "services", "intranet"],
+	"license": "MIT",
+	"authors": [
+		{
+			"name": "MTai88 (Tair Minsafaev)"
+		}
+	],
+	"require": {
+		"php": ">=8.1"
+	},
+	"extra": {
+		"bitrix-module-id": "mtai.bpservices",
+		"install-path": "local/modules/mtai.bpservices"
+	}
+}
