@@ -24,6 +24,10 @@ use Bitrix\Main\Web\Uri;
 CJSCore::Init(array('window', 'lists'));
 Bitrix\Main\UI\Extension::load(["ui.buttons", "ui.dialogs.messagebox"]);
 
+// mtai.bpservices: FilePond — загрузчик файлов в полях-файлах списка
+\Bitrix\Main\Page\Asset::getInstance()->addCss('/bitrix/js/mtai.bpservices/filepond/filepond.min.css');
+\Bitrix\Main\Page\Asset::getInstance()->addJs('/bitrix/js/mtai.bpservices/filepond/filepond.min.js');
+
 $jsClass = 'ListsElementEditClass_'.$arResult['RAND_STRING'];
 $urlTabBp = (string)(new Uri($APPLICATION->GetCurPageParam("", array($arResult["FORM_ID"]."_active_tab"))))
 	->addParams([$arResult["FORM_ID"]."_active_tab" => "tab_bp"])
@@ -440,6 +444,38 @@ $APPLICATION->IncludeComponent(
 	<div id="lists-notify-admin-popup-content" class="lists-notify-admin-popup-content">
 	</div>
 </div>
+
+<script>
+	// mtai.bpservices: FilePond на файловых полях формы; выбранный файл
+	// FilePond синхронизирует обратно в input, отправка формы не меняется
+	BX.ready(function () {
+		if (!window.FilePond)
+		{
+			return;
+		}
+		var form = document.getElementById('form_<?= CUtil::JSEscape(htmlspecialcharsbx($arResult['FORM_ID'])) ?>');
+		if (!form)
+		{
+			return;
+		}
+
+		FilePond.setOptions({
+			labelIdle: 'Перетащите файл или <span class="filepond--label-action">выберите</span>',
+			labelInvalidField: 'Поле содержит файлы неподходящего типа',
+			labelFileTypeNotAllowed: 'Файл этого типа загрузить нельзя',
+			labelFileWaitingForSize: 'Определяем размер',
+			labelFileSizeNotAvailable: 'Размер недоступен',
+			labelFileLoading: 'Чтение файла',
+			labelFileLoadError: 'Не удалось прочитать файл',
+			labelTapToCancel: 'нажмите для отмены',
+			labelTapToRetry: 'нажмите для повтора'
+		});
+
+		form.querySelectorAll('input[type=file][name^="PROPERTY_"]').forEach(function (input) {
+			FilePond.create(input);
+		});
+	});
+</script>
 
 <script>
 	BX.ready(function () {

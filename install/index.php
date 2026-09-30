@@ -133,6 +133,15 @@ class mtai_bpservices extends CModule
 		CheckDirPath($componentsDir . '/mtai/');
 		CopyDirFiles(__DIR__ . '/components', $componentsDir, true, true);
 
+		// FilePond (загрузчик файлов в форме списка) → bitrix/js/mtai.bpservices/
+		CheckDirPath($documentRoot . '/bitrix/js/' . $this->MODULE_ID . '/filepond/');
+		CopyDirFiles(
+			__DIR__ . '/js/filepond',
+			$documentRoot . '/bitrix/js/' . $this->MODULE_ID . '/filepond',
+			true,
+			true
+		);
+
 		// страница рендерится в шаблоне портала по умолчанию;
 		// свой шаблон bp_services больше не ставится (с 0.4.1) —
 		// при обновлении удаляем его остатки от прежних установок
@@ -169,6 +178,7 @@ class mtai_bpservices extends CModule
 		DeleteDirFilesEx('/bp-services/');
 		DeleteDirFilesEx('/local/components/mtai/bpservices.grid/');
 		DeleteDirFilesEx('/local/components/bitrix/lists.element.edit/');
+		DeleteDirFilesEx('/bitrix/js/' . $this->MODULE_ID . '/filepond/');
 		$this->removeSiteTemplate();
 
 		$APPLICATION->SetFileAccessPermission('/bp-services/', []);
