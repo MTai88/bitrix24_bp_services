@@ -24,9 +24,16 @@ use Bitrix\Main\Web\Uri;
 CJSCore::Init(array('window', 'lists'));
 Bitrix\Main\UI\Extension::load(["ui.buttons", "ui.dialogs.messagebox"]);
 
-// mtai.bpservices: FilePond — загрузчик файлов в полях-файлах списка
-\Bitrix\Main\Page\Asset::getInstance()->addCss('/bitrix/js/mtai.bpservices/filepond/filepond.min.css');
-\Bitrix\Main\Page\Asset::getInstance()->addJs('/bitrix/js/mtai.bpservices/filepond/filepond.min.js');
+// mtai.bpservices: FilePond — загрузчик файлов в полях-файлах списка.
+// Подключение инлайн (не через Asset): форма открывается и в слайдере
+// (livefeed), где ассеты из Asset в ответ не попадают
+?>
+<link rel="stylesheet" href="/bitrix/js/mtai.bpservices/filepond/filepond.min.css">
+<script src="/bitrix/js/mtai.bpservices/filepond/filepond.min.js" data-skip-moving="true"></script>
+<style>
+	.bx-field-value .filepond--root { margin-bottom: 0; }
+</style>
+<?php
 
 $jsClass = 'ListsElementEditClass_'.$arResult['RAND_STRING'];
 $urlTabBp = (string)(new Uri($APPLICATION->GetCurPageParam("", array($arResult["FORM_ID"]."_active_tab"))))
@@ -445,36 +452,103 @@ $APPLICATION->IncludeComponent(
 	</div>
 </div>
 
-<script>
-	// mtai.bpservices: FilePond на файловых полях формы; выбранный файл
-	// FilePond синхронизирует обратно в input, отправка формы не меняется
-	BX.ready(function () {
-		if (!window.FilePond)
-		{
-			return;
-		}
-		var form = document.getElementById('form_<?= CUtil::JSEscape(htmlspecialcharsbx($arResult['FORM_ID'])) ?>');
-		if (!form)
-		{
-			return;
-		}
+<script data-skip-moving="true">
+	// mtai.bpservices: FilePond на файловых полях формы.
+	// Одиночное поле — пруд на самом input (FilePond вернёт файл в input при отправке).
+	// Множественное поле — штатная таблица рядов + кнопка «Добавить» скрываются,
+	// вместо них один пруд с мультизагрузкой; перед отправкой файлы раскладываются
+	// по отдельным input'ам PROPERTY_X[nI][VALUE] — серверная часть не меняется.
+	(function () {
+		var initFilePond = function () {
+			if (!window.FilePond)
+			{
+				return;
+			}
+			var form = document.getElementById('form_<?= CUtil::JSEscape(htmlspecialcharsbx($arResult['FORM_ID'])) ?>');
+			if (!form || form.getAttribute('data-filepond'))
+			{
+				return;
+			}
+			form.setAttribute('data-filepond', 'Y');
 
-		FilePond.setOptions({
-			labelIdle: 'Перетащите файл или <span class="filepond--label-action">выберите</span>',
-			labelInvalidField: 'Поле содержит файлы неподходящего типа',
-			labelFileTypeNotAllowed: 'Файл этого типа загрузить нельзя',
-			labelFileWaitingForSize: 'Определяем размер',
-			labelFileSizeNotAvailable: 'Размер недоступен',
-			labelFileLoading: 'Чтение файла',
-			labelFileLoadError: 'Не удалось прочитать файл',
-			labelTapToCancel: 'нажмите для отмены',
-			labelTapToRetry: 'нажмите для повтора'
-		});
+			var labels = {
+				labelInvalidField: 'Поле содержит файлы неподходящего типа',
+				labelFileTypeNotAllowed: 'Файл этого типа загрузить нельзя',
+				labelFileWaitingForSize: 'Определяем размер',
+				labelFileSizeNotAvailable: 'Размер недоступен',
+				labelFileLoading: 'Чтение файла',
+				labelFileLoadError: 'Не удалось прочитать файл'
+			};
 
-		form.querySelectorAll('input[type=file][name^="PROPERTY_"]').forEach(function (input) {
-			FilePond.create(input);
-		});
-	});
+			// одиночные файловые поля
+			form.querySelectorAll('input[type=file][name^="PROPERTY_"]').forEach(function (input) {
+				if (input.closest('table[id^="tblPROPERTY_"]'))
+				{
+					return;
+				}
+				var options = Object.assign({}, labels, {
+					labelIdle: 'Перетащите файл или <span class="filepond--label-action">выберите</span>'
+				});
+				FilePond.create(input, options);
+			});
+
+			// множественные файловые поля
+			form.querySelectorAll('table[id^="tblPROPERTY_"]').forEach(function (tbl) {
+				var firstInput = tbl.querySelector('input[type=file]');
+				if (!firstInput)
+				{
+					return;
+				}
+				var nameMatch = firstInput.name.match(/^(PROPERTY_\d+)\[/);
+				if (!nameMatch)
+				{
+					return;
+				}
+				var propName = nameMatch[1];
+
+				tbl.style.display = 'none';
+				var addButton = tbl.parentNode.querySelector('input[type=button][onclick*="' + tbl.id + '"]');
+				if (addButton)
+				{
+					addButton.style.display = 'none';
+				}
+
+				var pond = FilePond.create(Object.assign({}, labels, {
+					allowMultiple: true,
+					labelIdle: 'Перетащите файлы или <span class="filepond--label-action">выберите</span>'
+				}));
+				tbl.parentNode.insertBefore(pond.element, tbl);
+
+				form.addEventListener('submit', function () {
+					var files = pond.getFiles();
+					for (var i = 0; i < files.length; i++)
+					{
+						var dt = new DataTransfer();
+						dt.items.add(files[i].file);
+						if (!dt.files.length)
+						{
+							continue;
+						}
+						var input = document.createElement('input');
+						input.type = 'file';
+						input.name = propName + '[n' + i + '][VALUE]';
+						input.files = dt.files;
+						input.style.display = 'none';
+						form.appendChild(input);
+					}
+				}, true);
+			});
+		};
+
+		if (document.readyState === 'loading')
+		{
+			document.addEventListener('DOMContentLoaded', initFilePond);
+		}
+		else
+		{
+			initFilePond();
+		}
+	})();
 </script>
 
 <script>
