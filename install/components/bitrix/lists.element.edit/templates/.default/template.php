@@ -503,7 +503,9 @@ $APPLICATION->IncludeComponent(
 			var makeProcess = function (propertyId) {
 				return function (fieldName, file, metadata, load, error, progress) {
 					var formData = new FormData();
-					formData.append(fieldName, file, file.name);
+					// fieldName у программного пруда пуст (опция name не задана) —
+					// часть должна называться ровно 'file', как ждёт контроллер
+					formData.append('file', file, file.name || 'file');
 					formData.append('sessid', sessid);
 					formData.append('iblockId', iblockId);
 					formData.append('propertyId', String(propertyId));
