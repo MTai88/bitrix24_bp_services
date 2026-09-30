@@ -16,7 +16,6 @@ use Bitrix\Main\Application;
 use Bitrix\Main\EventManager;
 use Bitrix\Main\Localization\Loc;
 use Bitrix\Main\ModuleManager;
-use Bitrix\Main\SiteTable;
 use Bitrix\Main\SiteTemplateTable;
 use Mtai\Bpservices\IblockManager;
 
@@ -134,28 +133,10 @@ class mtai_bpservices extends CModule
 		CheckDirPath($componentsDir . '/mtai/');
 		CopyDirFiles(__DIR__ . '/components', $componentsDir, true, true);
 
-		// light site template bp_services
-		$templatesDir = $documentRoot . '/local/templates';
-		CheckDirPath($templatesDir . '/');
-		CopyDirFiles(__DIR__ . '/templates', $templatesDir, true, true);
-
-		// rule: /bp-services/ → bp_services (sort < 150 to win over the bitrix24 shell)
-		$rsSites = SiteTable::getList(['select' => ['LID'], 'filter' => ['=ACTIVE' => 'Y']]);
-		while ($site = $rsSites->fetch())
-		{
-			$exists = SiteTemplateTable::getList([
-				'filter' => ['=SITE_ID' => $site['LID'], '=TEMPLATE' => self::SITE_TEMPLATE],
-			])->fetch();
-			if (!$exists)
-			{
-				SiteTemplateTable::add([
-					'SITE_ID' => $site['LID'],
-					'CONDITION' => "CSite::InDir('/bp-services/')",
-					'SORT' => 70,
-					'TEMPLATE' => self::SITE_TEMPLATE,
-				]);
-			}
-		}
+		// страница рендерится в шаблоне портала по умолчанию;
+		// свой шаблон bp_services больше не ставится (с 0.4.1) —
+		// при обновлении удаляем его остатки от прежних установок
+		$this->removeSiteTemplate();
 
 		// group 2 = all users incl. guests; unauthorized visitors are redirected
 		// to /auth/ by the page itself
@@ -164,13 +145,12 @@ class mtai_bpservices extends CModule
 		return true;
 	}
 
-	public function UnInstallFiles(): bool
+	/**
+	 * Deletes the bp_services site template and its b_site_template rules
+	 * (installed by module versions before 0.4.1).
+	 */
+	private function removeSiteTemplate(): void
 	{
-		global $APPLICATION;
-
-		DeleteDirFilesEx('/bp-services/');
-		DeleteDirFilesEx('/local/components/mtai/bpservices.grid/');
-		DeleteDirFilesEx('/local/components/bitrix/lists.element.edit/');
 		DeleteDirFilesEx('/local/templates/' . self::SITE_TEMPLATE . '/');
 
 		$rows = SiteTemplateTable::getList([
@@ -180,6 +160,16 @@ class mtai_bpservices extends CModule
 		{
 			SiteTemplateTable::delete($row['ID']);
 		}
+	}
+
+	public function UnInstallFiles(): bool
+	{
+		global $APPLICATION;
+
+		DeleteDirFilesEx('/bp-services/');
+		DeleteDirFilesEx('/local/components/mtai/bpservices.grid/');
+		DeleteDirFilesEx('/local/components/bitrix/lists.element.edit/');
+		$this->removeSiteTemplate();
 
 		$APPLICATION->SetFileAccessPermission('/bp-services/', []);
 

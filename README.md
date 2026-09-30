@@ -79,10 +79,12 @@ https://portal/bizproc/processes/13/element/0/0/?list_section_id=
 - обработчики событий синхронизации селекта;
 - файл ` /bp-services/index.php` с компонентом `mtai:bpservices.grid`
   (кеширование с тегом инфоблока);
-- лёгкий шаблон сайта `bp_services` + правило `CSite::InDir('/bp-services/')`
-  (sort 70), чтобы страница не рендерилась в тяжёлой CRM-оболочке;
 - файловый доступ на чтение для группы «Все пользователи» (гейт авторизации —
   в коде страницы).
+
+Страница рендерится **в шаблоне портала по умолчанию**. Своего шаблона модуль
+не ставит (до 0.4.1 ставился лёгкий `bp_services` — при обновлении он и его
+правило в `b_site_template` автоматически удаляются).
 
 Удаление модуля сносит всё перечисленное, включая элементы инфоблока.
 
@@ -106,7 +108,6 @@ install/components/bitrix/lists.element.edit/  кастомная форма с�
 install/components/mtai/bpservices.grid/       плитка сервисов (в local/components)
 install/index.php            установщик
 install/public/bp-services/  публичная страница (копируется в корень сайта)
-install/templates/bp_services/ лёгкий шаблон сайта (копируется в local/templates)
 lib/IblockManager.php        реестр: инфоблок, свойства, синхронизация селекта
 lib/EventHandler.php         обработчики OnAfterIBlock* → синхронизация
 ```
