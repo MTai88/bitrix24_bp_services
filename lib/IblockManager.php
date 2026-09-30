@@ -96,11 +96,13 @@ class IblockManager
 	 */
 	public static function installInfoblock(): int
 	{
-		if (self::getServicesIblockId() > 0)
+		$iblockId = self::getServicesIblockId();
+		if ($iblockId > 0)
 		{
+			self::enableExtendedRights($iblockId);
 			self::syncProcessEnum();
 
-			return self::getServicesIblockId();
+			return $iblockId;
 		}
 
 		$rsType = CIBlockType::GetList([], ['=ID' => self::IBLOCK_TYPE]);
@@ -149,7 +151,11 @@ class IblockManager
 			'IBLOCK_TYPE_ID' => self::IBLOCK_TYPE,
 			'SITE_ID' => $siteIds,
 			'SORT' => 100,
-			// 1 = portal administrators, 2 = all users (the page is read-only for employees)
+			// 1 = portal administrators, 2 = all users (the page is read-only for employees).
+			// RIGHTS_MODE=E: расширенное управление правами; ядро само конвертирует
+			// GROUP_ID в права инфоблока при создании (ConvertGroups + SetRights),
+			// дальше права настраиваются в админке, элементы фильтруются по ним.
+			'RIGHTS_MODE' => 'E',
 			'GROUP_ID' => [1 => 'X', 2 => 'R'],
 			'WORKFLOW' => 'N',
 			'LIST_PAGE_URL' => '#SITE_DIR#bp-services/',
@@ -174,7 +180,30 @@ class IblockManager
 	}
 
 	/**
+	 * Switches the services infoblock to the extended rights mode (расширенное
+	 * управление правами). On switch the kernel converts the simple GROUP_ID
+	 * rights into iblock rights. An iblock already in extended mode is left
+	 * as is — manual rights set in the admin are not rewritten.
+	 *
 	 * @param int $iblockId services infoblock ID
+	 */
+	public static function enableExtendedRights(int $iblockId): void
+	{
+		$current = CIBlock::GetArrayByID($iblockId);
+		if (!$current || ($current['RIGHTS_MODE'] ?? 'S') === 'E')
+		{
+			return;
+		}
+
+		$obIblock = new CIBlock();
+		$obIblock->Update($iblockId, [
+			'RIGHTS_MODE' => 'E',
+			'GROUP_ID' => [1 => 'X', 2 => 'R'],
+		]);
+	}
+
+	/**
+	 * @param int $iblockId services iblock ID
 	 * @throws RuntimeException
 	 */
 	public static function ensureProperties(int $iblockId): void
