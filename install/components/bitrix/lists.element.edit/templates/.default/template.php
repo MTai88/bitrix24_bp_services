@@ -490,7 +490,11 @@ $APPLICATION->IncludeComponent(
 				labelFileProcessing: 'Загрузка…',
 				labelFileProcessingComplete: 'Загружен',
 				labelFileProcessingAborted: 'Отменена',
-				labelFileProcessingError: 'Не удалось загрузить файл'
+				// функция: FilePond показывает эту подпись вместо сообщения
+				// из error(), передаём в неё реальную причину с сервера
+				labelFileProcessingError: function (err) {
+					return (err && err.body) || 'Не удалось загрузить файл';
+				}
 			};
 
 			// process строго функцией: конфиг-объект с onload в этой версии
@@ -513,16 +517,18 @@ $APPLICATION->IncludeComponent(
 						}
 					});
 					xhr.addEventListener('load', function () {
+						try { console.warn('mtai.bpservices upload:', xhr.status, xhr.responseText.substring(0, 500)); } catch (e) {}
 						if (xhr.status < 200 || xhr.status >= 300)
 						{
-							error('HTTP ' + xhr.status);
+							error('HTTP ' + xhr.status + ': ' + xhr.responseText.substring(0, 200));
 							return;
 						}
 						var data = null;
 						try { data = JSON.parse(xhr.responseText); } catch (e) {}
 						if (!data || data.status !== 'success' || !data.data || !data.data.id)
 						{
-							error((data && data.errors && data.errors.length ? data.errors[0].message : null) || 'Не удалось загрузить файл');
+							var serverMessage = data && data.errors && data.errors.length ? data.errors[0].message : null;
+							error(serverMessage || ('Ответ: ' + xhr.responseText.substring(0, 200)));
 							return;
 						}
 						load(data.data.id);
