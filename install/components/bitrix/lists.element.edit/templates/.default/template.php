@@ -47,7 +47,9 @@ global $USER;
 $isAdmin = is_object($USER) && $USER->IsAdmin();
 // копия элемента — тоже создание
 $isAddForm = !((int)$arResult["ELEMENT_ID"] > 0 && !(int)$arResult["COPY_ID"] > 0);
-$bpServicesCancelUrl = '/bp-services/';
+// mtai.bpservices: «Отменить» — при добавлении на страницу сервисов,
+// при изменении — к запущенным процессам
+$cancelUrl = $isAddForm ? '/bp-services/' : '/bizproc/userprocesses/';
 
 $listAction = array();
 if (isset($arResult["LIST_COPY_ELEMENT_URL"]))
@@ -96,8 +98,8 @@ if(!IsModuleInstalled("intranet"))
 
 \Bitrix\UI\Toolbar\Facade\Toolbar::deleteFavoriteStar();
 \Bitrix\UI\Toolbar\Facade\Toolbar::addButton([
-		// mtai.bpservices: сотрудник возвращается на страницу сервисов
-		'link' => $isAdmin ? $arResult["LIST_SECTION_URL"] : $bpServicesCancelUrl,
+		// mtai.bpservices: возврат — как у кнопки «Отменить»
+		'link' => $isAdmin ? $arResult["LIST_SECTION_URL"] : $cancelUrl,
 		'color' => \Bitrix\UI\Buttons\Color::LINK,
 		'text' => GetMessage("CT_BLEE_TOOLBAR_RETURN_LIST_ELEMENT_MSGVER_1"),
 		'icon' => Bitrix\UI\Buttons\Icon::BACK,
@@ -405,7 +407,7 @@ if ($arParams["CAN_EDIT"])
 		. GetMessage($isAddForm ? "MTAI_BPS_FORM_BUTTON_ADD" : "MTAI_BPS_FORM_BUTTON_EDIT") . '" />';
 }
 $customButtons .= '<input type="button" value="' . GetMessage("CT_BLEE_FORM_CANCEL")
-	. '" name="cancel" onclick="window.location=\'' . CUtil::addslashes($bpServicesCancelUrl) . '\'"'
+	. '" name="cancel" onclick="window.location=\'' . CUtil::addslashes($cancelUrl) . '\'"'
 	. ' title="' . GetMessage("CT_BLEE_FORM_CANCEL_TITLE") . '" />';
 
 $lockStatus = CLists::isEnabledLockFeature($arResult["IBLOCK_ID"]) && $arResult["ELEMENT_ID"];

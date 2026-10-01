@@ -47,6 +47,10 @@ $IBLOCK_ID = is_array($arParams['~IBLOCK_ID'])? 0: (int)$arParams['~IBLOCK_ID'];
 $ELEMENT_ID = is_array($arParams['~ELEMENT_ID'])? 0: (int)$arParams['~ELEMENT_ID'];
 $SECTION_ID = is_array($arParams['~SECTION_ID'])? 0: (int)$arParams['~SECTION_ID'];
 
+// mtai.bpservices: форма добавления (элемент ещё не создан) или изменения;
+// фиксируется до возможной перезаписи ELEMENT_ID при создании
+$mtaiIsAddForm = ($ELEMENT_ID <= 0);
+
 // mtai.bpservices: FilePond AJAX-загрузка. Контроллер модуля
 // (mtai.bpservices:file.upload) сохраняет файл и возвращает id; форма
 // отправляет только id (mtai_bpservices_files[PROPERTY_X][nK]). Здесь id
@@ -1044,10 +1048,15 @@ if(
 			{
 				LocalRedirect($backUrl);
 			}
-			// mtai.bpservices: после добавления/изменения элемента — всегда
-			// на «Запущенные процессы», даже если форма открыта без back_url
+			// mtai.bpservices: при изменении остаёмся на странице элемента;
+			// добавление без back_url — к запущенным процессам
+			// (форма с плитки сервисов несёт back_url)
 			elseif(isset($_POST["save"]))
 			{
+				if (!$mtaiIsAddForm)
+				{
+					LocalRedirect($url);
+				}
 				LocalRedirect('/bizproc/userprocesses/');
 			}
 			elseif(
