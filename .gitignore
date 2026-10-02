@@ -1,10 +1,5 @@
-# OS / IDE
-.DS_Store
-Thumbs.db
-.idea/
-.vscode/
-*.swp
-
-# временные файлы
-*.log
-*.bak
+# репозиторий решения: отслеживается только модуль mtai.bpservices
+/*
+!/mtai.bpservices/
+!/README.md
+!/.gitignore
